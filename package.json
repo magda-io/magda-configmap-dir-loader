@@ -1,0 +1,39 @@
+{
+  "name": "magda-opa-policy-loader",
+  "version": "0.0.57-0",
+  "description": "A k8s init container docker image to deserialise OPA policy files from multiple k8s configMaps",
+  "repository": "git@github.com:magda-io/magda-opa-policy-loader.git",
+  "author": "Jacky Jiang <t83714@gmail.com>",
+  "license": "Apache License 2.0",
+  "private": true,
+  "scripts": {
+    "prebuild": "rimraf dist tsconfig.tsbuildinfo",
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "dev": "ts-node dist/index.js",
+    "test": "mocha --require ts-node/register \"src/test/**/*.spec.ts\"",
+    "docker-build-local": "create-docker-context-for-node-component --build --push --tag auto --local",
+    "docker-build-prod": "create-docker-context-for-node-component --build --push --tag auto",
+    "retag-and-push": "retag-and-push"
+  },
+  "devDependencies": {
+    "@magda/scripts": "^0.0.57-0-beta-2",
+    "@types/fs-extra": "^9.0.1",
+    "@types/node": "^14.0.27",
+    "husky": "^3.1.0",
+    "prettier": "^1.19.1",
+    "pretty-quick": "^2.0.1",
+    "rimraf": "^3.0.0",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.2"
+  },
+  "dependencies": {
+    "fs-extra": "^9.0.1"
+  },
+  "config": {
+    "docker": {
+      "name": "data61/configmap-dir-loader",
+      "include": "node_modules dist Dockerfile package.json"
+    }
+  }
+}

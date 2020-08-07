@@ -1,0 +1,39 @@
+name: CI Release Helm Chart
+
+on:
+  release:
+    types: [published]
+
+env:
+  REPO_NAME: magda-configmap-dir-loader
+
+jobs:
+  release-helm-chart:
+    name: Release Docker Image to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 12
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - run: yarn install
+      - run: yarn build
+      - run: yarn test
+
+      - name: Login to GitHub Package Repository
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: docker login docker.pkg.github.com -u magdabot -p ${GH_TOKEN}
+
+      - name: Build Docker Image & Push to Github Registry
+        run: yarn docker-build-prod --repository=docker.pkg.github.com/magda-io/${REPO_NAME} --name=${REPO_NAME}
+
+      - name: Login to Docker Hub
+        env:
+          DH_TOKEN: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        run: docker login -u magdabot -p ${DH_TOKEN}
+
+      - name: Re-tag & Push Docker Image to Docker Hub
+        run: yarn retag-and-push --fromPrefix=docker.pkg.github.com/magda-io/${REPO_NAME}/ --fromName=${REPO_NAME}
