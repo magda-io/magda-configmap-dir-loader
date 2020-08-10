@@ -1,34 +1,39 @@
 import path from "path";
 import fs from "fs";
 import fse from "fs-extra";
+import { execSync } from "child_process";
+
+const isDebugMode = process.env["DEBUG"] === "true" ? true : false;
 
 function extractCfgMapDir(sourceDir: string, targetDir: string) {
-    let dir: fs.Dir;
-    try {
-        dir = fs.opendirSync(sourceDir);
-        let item: fs.Dirent;
-        while ((item = dir.readSync())) {
-            if (!item.isFile()) {
-                continue;
-            }
-            if (
-                path
-                    .extname(item.name)
-                    .toLowerCase()
-                    .trim() !== ".json"
-            ) {
-                continue;
-            }
-            extractCfgMapJsonFile(targetDir, path.join(sourceDir, item.name));
-        }
-    } finally {
-        if (dir) {
-            dir.closeSync();
-        }
+    if (isDebugMode) {
+        console.log(`Decoding files in ${sourceDir}...`);
     }
+    const dirItems = fs.readdirSync(sourceDir, { encoding: "utf8" });
+    dirItems.forEach(dirItem => {
+        const itemPath = path.join(sourceDir, dirItem);
+        const isJsonFile =
+            path
+                .extname(dirItem)
+                .toLowerCase()
+                .trim() === ".json";
+
+        if (!isJsonFile) {
+            return;
+        }
+        // we won't check whether the dirItem is a directory here as configMap file comes with 0444 permission
+        // any attempt to query whther it is file or directory will always return false instead
+        extractCfgMapJsonFile(targetDir, itemPath);
+    });
 }
 
 function extractCfgMapJsonFile(targetDir: string, filePath: string) {
+    if (isDebugMode) {
+        console.log(
+            `Decoding configMap data file: ${filePath} to ${targetDir}`
+        );
+    }
+
     const data = fse.readJSONSync(filePath);
     const pathLists = Object.keys(data);
     pathLists.forEach(p => {
@@ -76,10 +81,20 @@ export default function main() {
             });
         }
 
+        if (isDebugMode) {
+            console.log("List target dir before decode files: ");
+            console.log(execSync(`ls ${targetDir}`, { encoding: "utf8" }));
+        }
+
         extractCfgMapDir(defaultCfgMapDir, targetDir);
 
         if (fse.existsSync(extraCfgMapDir)) {
             extractCfgMapDir(extraCfgMapDir, targetDir);
+        }
+
+        if (isDebugMode) {
+            console.log("List target dir after decode all files: ");
+            console.log(execSync(`ls ${targetDir}`, { encoding: "utf8" }));
         }
     } catch (e) {
         console.error(`Error: ${e}`);
