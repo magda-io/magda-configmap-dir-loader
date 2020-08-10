@@ -40,7 +40,7 @@
   },
   "config": {
     "docker": {
-      "name": "data61/configmap-dir-loader",
+      "name": "data61/magda-configmap-dir-loader",
       "include": "node_modules dist Dockerfile package.json"
     }
   }
