@@ -14,21 +14,26 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 12
+      - name: Use Node.js 14
         uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 14
       - run: yarn install
       - run: yarn build
       - run: yarn test
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
       - name: Login to GitHub Package Repository
         env:
           GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
         run: docker login docker.pkg.github.com -u magdabot -p ${GH_TOKEN}
 
-      - name: Build Docker Image & Push to Github Registry
-        run: yarn docker-build-prod --repository=docker.pkg.github.com/magda-io/${REPO_NAME} --name=${REPO_NAME}
+      - name: Build Docker Image & Push to Github Container Registry
+        run: yarn docker-build-prod --repository=ghcr.io/${{ github.repository_owner }} --name=${REPO_NAME} --version=${GITHUB_SHA} --platform=linux/amd64,linux/arm64
 
       - name: Login to Docker Hub
         env:
@@ -36,4 +41,10 @@ jobs:
         run: docker login -u magdabot -p ${DH_TOKEN}
 
       - name: Re-tag & Push Docker Image to Docker Hub
-        run: yarn retag-and-push --fromPrefix=docker.pkg.github.com/magda-io/${REPO_NAME}/ --fromName=${REPO_NAME}
+        run: |
+          PACKAGE_JSON_VERSION=$(jq -r ".version" package.json)
+          chmod +r $HOME/.docker/config.json
+          docker container run --rm --net host \
+            -v regctl-conf:/home/appuser/.regctl/ \
+            -v $HOME/.docker/config.json:/home/appuser/.docker/config.json \
+            regclient/regctl:v0.3.9 image copy ghcr.io/${{ github.repository_owner }}/${REPO_NAME}:${GITHUB_SHA} docker.io/data61/${REPO_NAME}:${PACKAGE_JSON_VERSION}
