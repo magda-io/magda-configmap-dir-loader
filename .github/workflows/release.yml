@@ -12,23 +12,47 @@ jobs:
     name: Release Docker Image to Docker Hub
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Version validation
+        run: |
+          SEMVER_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          [[ "${CI_COMMIT_TAG}" =~ $SEMVER_REGEX ]] || { echo "Invalid version number tag '$CI_COMMIT_TAG'. Should be e.g. 'v2.0.0-alpha.0' with a leading 'v'." ; exit 1; }
+
+      - uses: actions/checkout@v3
 
       - name: Use Node.js 12
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: 12
       - run: yarn install
       - run: yarn build
       - run: yarn test
 
-      - name: Login to GitHub Package Repository
-        env:
-          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-        run: docker login docker.pkg.github.com -u magdabot -p ${GH_TOKEN}
+      - name: Login to GitHub Container Registry
+        run: |
+          REPO_OWNER=`echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]'`
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build Docker Image & Push to Github Registry
-        run: yarn docker-build-prod --repository=docker.pkg.github.com/magda-io/${REPO_NAME} --name=${REPO_NAME}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+  
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build Docker Image & Push
+        run: |
+          REPO_OWNER=`echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]'`
+          yarn docker-build-prod --repository=ghcr.io/${REPO_OWNER} --name=${REPO_NAME} --version=${GITHUB_SHA} --platform=linux/amd64,linux/arm64
+
+      - name: Re-tag & Push Docker Images
+        run: |
+          REPO_OWNER=`echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]'`
+          PACKAGE_JSON_VERSION=$(jq -r ".version" ./package.json)
+          chmod +r $HOME/.docker/config.json
+          # Re-push to ghcr.io
+          docker container run --rm --net host \
+            -v regctl-conf:/home/appuser/.regctl/ \
+            -v $HOME/.docker/config.json:/home/appuser/.docker/config.json \
+            regclient/regctl:v0.3.9 image copy ghcr.io/${REPO_OWNER}/${REPO_NAME}:${GITHUB_SHA} ghcr.io/${REPO_OWNER}/${REPO_NAME}:${PACKAGE_JSON_VERSION}
 
       - name: Login to Docker Hub
         env:
