@@ -17,7 +17,8 @@
     "retag-and-push": "retag-and-push"
   },
   "devDependencies": {
-    "@magda/scripts": "^0.0.57-0-beta-2",
+    "@magda/ci-utils": "^1.0.2",
+    "@magda/docker-utils": "^1.2.0",
     "@types/chai": "^4.2.12",
     "@types/fs-extra": "^9.0.1",
     "@types/mocha": "^8.0.1",
